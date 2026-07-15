@@ -15,10 +15,8 @@ fs.mkdirSync(uploadDir, { recursive: true });
 
 const app = express();
 const port = process.env.PORT || 4000;
-const upload = multer({
-  dest: uploadDir,
-  limits: { fileSize: 20 * 1024 * 1024 },
-});
+const facultyUpload = multer({ dest: uploadDir, limits: { fileSize: 6 * 1024 * 1024 } });
+const studentUpload = multer({ dest: uploadDir, limits: { fileSize: 2 * 1024 * 1024 } });
 
 app.use(cors());
 app.use(express.json());
@@ -65,7 +63,7 @@ app.get('/api/assignments', async (request, response) => {
   response.json(rows);
 });
 
-app.post('/api/assignments', upload.single('assignment_file'), async (request, response) => {
+app.post('/api/assignments', facultyUpload.single('assignment_file'), async (request, response) => {
   const assignment = {
     assignment_id: id('asn'),
     faculty_id: request.body.faculty_id || 'fac-001',
@@ -74,6 +72,8 @@ app.post('/api/assignments', upload.single('assignment_file'), async (request, r
     assignment_file_url: request.file ? `/uploads/${request.file.filename}` : null,
     assignment_original_name: request.file?.originalname || null,
     subject_id: request.body.subject_id,
+    course: request.body.course,
+    semester: request.body.semester,
     deadline: request.body.deadline,
     allow_resubmit: request.body.allow_resubmit === 'on' || request.body.allow_resubmit === 'true' ? 1 : 0,
     allow_late: 1,
@@ -88,12 +88,14 @@ app.post('/api/assignments', upload.single('assignment_file'), async (request, r
       assignment_file_url,
       assignment_original_name,
       subject_id,
+      course,
+      semester,
       faculty_id,
       deadline,
       allow_resubmit,
       allow_late,
       created_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       assignment.assignment_id,
       assignment.title,
@@ -101,6 +103,8 @@ app.post('/api/assignments', upload.single('assignment_file'), async (request, r
       assignment.assignment_file_url,
       assignment.assignment_original_name,
       assignment.subject_id,
+      assignment.course,
+      assignment.semester,
       assignment.faculty_id,
       assignment.deadline,
       assignment.allow_resubmit,
@@ -131,7 +135,7 @@ app.delete('/api/assignments/:assignmentId', async (request, response) => {
 
 app.get('/api/assignments/:assignmentId/submissions', async (request, response) => {
   const rows = await all(
-    `SELECT u.user_id, u.name, sub.*
+    `SELECT u.user_id, u.name, u.registration_no, sub.*
     FROM enrollments e
     JOIN assignments a ON a.subject_id = e.subject_id
     JOIN users u ON u.user_id = e.student_id
@@ -144,7 +148,7 @@ app.get('/api/assignments/:assignmentId/submissions', async (request, response) 
   response.json(rows);
 });
 
-app.post('/api/assignments/:assignmentId/submit', upload.single('file'), async (request, response) => {
+app.post('/api/assignments/:assignmentId/submit', studentUpload.single('file'), async (request, response) => {
   const assignment = await get('SELECT * FROM assignments WHERE assignment_id = ?', [request.params.assignmentId]);
   if (!assignment) return response.status(404).json({ error: 'Assignment not found' });
 
@@ -211,7 +215,8 @@ app.get('/api/notes', async (request, response) => {
     upvoted: 'n.upvote_count DESC',
   }[sort] || 'n.uploaded_at DESC';
   const params = [];
-  let where = "n.status != 'taken_down'";
+  const facultyView = request.query.facultyId;
+  let where = facultyView ? '1 = 1' : "n.status = 'active'";
 
   if (subjectId && subjectId !== 'all') {
     where += ' AND n.subject_id = ?';
@@ -231,7 +236,7 @@ app.get('/api/notes', async (request, response) => {
   response.json(rows);
 });
 
-app.post('/api/notes', upload.single('file'), async (request, response) => {
+app.post('/api/notes', facultyUpload.single('file'), async (request, response) => {
   const note = {
     note_id: id('note'),
     title: request.body.title,
@@ -286,6 +291,33 @@ app.post('/api/notes/:noteId/report', async (request, response) => {
   response.status(201).json({ ok: true });
 });
 
+app.patch('/api/notes/:noteId/visibility', async (request, response) => {
+  const status = request.body.status;
+  if (!['hidden', 'active'].includes(status)) {
+    return response.status(400).json({ error: 'Invalid note visibility status' });
+  }
+
+  const note = await get('SELECT * FROM notes WHERE note_id = ?', [request.params.noteId]);
+  if (!note) return response.status(404).json({ error: 'Note not found' });
+
+  await run('UPDATE notes SET status = ? WHERE note_id = ?', [status, note.note_id]);
+  response.json({ ok: true, status });
+});
+
+app.delete('/api/notes/:noteId', async (request, response) => {
+  const note = await get('SELECT * FROM notes WHERE note_id = ?', [request.params.noteId]);
+  if (!note) return response.status(404).json({ error: 'Note not found' });
+
+  await run('DELETE FROM note_upvotes WHERE note_id = ?', [note.note_id]);
+  await run('DELETE FROM note_reports WHERE note_id = ?', [note.note_id]);
+  await run('DELETE FROM notes WHERE note_id = ?', [note.note_id]);
+  const uploadedFile = path.join(uploadDir, path.basename(note.file_url));
+  await fs.promises.unlink(uploadedFile).catch((error) => {
+    if (error.code !== 'ENOENT') throw error;
+  });
+  response.json({ ok: true });
+});
+
 app.get('/api/reports', async (_request, response) => {
   const rows = await all(
     `SELECT r.*, n.title, n.file_url, u.name AS reporter
@@ -312,6 +344,13 @@ app.patch('/api/reports/:reportId', async (request, response) => {
   }
 
   response.json({ ok: true });
+});
+
+app.use((error, _request, response, next) => {
+  if (error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE') {
+    return response.status(413).json({ error: 'The selected file exceeds this upload limit.' });
+  }
+  return next(error);
 });
 
 initializeDatabase().then(() => {

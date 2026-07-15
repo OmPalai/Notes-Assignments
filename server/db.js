@@ -58,6 +58,14 @@ export async function initializeDatabase() {
 async function migrate() {
   const assignmentColumns = await all('PRAGMA table_info(assignments)');
   const columnNames = assignmentColumns.map((column) => column.name);
+  const userColumns = await all('PRAGMA table_info(users)');
+  const userColumnNames = userColumns.map((column) => column.name);
+
+  if (!userColumnNames.includes('registration_no')) {
+    await run('ALTER TABLE users ADD COLUMN registration_no TEXT');
+    await run("UPDATE users SET registration_no = '2505280041' WHERE user_id = 'stu-001'");
+    await run("UPDATE users SET registration_no = '2505280042' WHERE user_id = 'stu-002'");
+  }
 
   if (!columnNames.includes('assignment_file_url')) {
     await run('ALTER TABLE assignments ADD COLUMN assignment_file_url TEXT');
@@ -65,6 +73,37 @@ async function migrate() {
 
   if (!columnNames.includes('assignment_original_name')) {
     await run('ALTER TABLE assignments ADD COLUMN assignment_original_name TEXT');
+  }
+
+  if (!columnNames.includes('semester')) {
+    await run('ALTER TABLE assignments ADD COLUMN semester TEXT');
+  }
+
+  if (!columnNames.includes('course')) {
+    await run('ALTER TABLE assignments ADD COLUMN course TEXT');
+  }
+
+  const notesTable = await get("SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'notes'");
+  if (notesTable?.sql && !notesTable.sql.includes("'hidden'")) {
+    await run('ALTER TABLE notes RENAME TO notes_legacy');
+    await run(`CREATE TABLE notes (
+      note_id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      subject_id TEXT NOT NULL,
+      topic TEXT NOT NULL,
+      uploaded_by TEXT NOT NULL,
+      file_url TEXT NOT NULL,
+      original_name TEXT NOT NULL,
+      description TEXT,
+      download_count INTEGER NOT NULL DEFAULT 0,
+      upvote_count INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'hidden', 'reported', 'taken_down')),
+      uploaded_at TEXT NOT NULL,
+      FOREIGN KEY (subject_id) REFERENCES subjects(subject_id),
+      FOREIGN KEY (uploaded_by) REFERENCES users(user_id)
+    )`);
+    await run('INSERT INTO notes SELECT * FROM notes_legacy');
+    await run('DROP TABLE notes_legacy');
   }
 }
 
@@ -76,10 +115,10 @@ async function seed() {
   await run("INSERT INTO subjects VALUES ('sub-os', 'Operating Systems')");
   await run("INSERT INTO subjects VALUES ('sub-web', 'Web Technologies')");
 
-  await run("INSERT INTO users VALUES ('stu-001', 'Aarav Mohanty', 'student')");
-  await run("INSERT INTO users VALUES ('stu-002', 'Priya Das', 'student')");
-  await run("INSERT INTO users VALUES ('fac-001', 'Prof. Meera Sen', 'faculty')");
-  await run("INSERT INTO users VALUES ('admin-001', 'Admin User', 'admin')");
+  await run("INSERT INTO users (user_id, name, registration_no, role) VALUES ('stu-001', 'Aarav Mohanty', '2505280041', 'student')");
+  await run("INSERT INTO users (user_id, name, registration_no, role) VALUES ('stu-002', 'Priya Das', '2505280042', 'student')");
+  await run("INSERT INTO users (user_id, name, role) VALUES ('fac-001', 'Prof. Meera Sen', 'faculty')");
+  await run("INSERT INTO users (user_id, name, role) VALUES ('admin-001', 'Admin User', 'admin')");
 
   await run("INSERT INTO enrollments VALUES ('stu-001', 'sub-dbms')");
   await run("INSERT INTO enrollments VALUES ('stu-001', 'sub-os')");

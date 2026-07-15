@@ -33,6 +33,7 @@ export default function StudentAssignmentsPage({ assignments, pendingAssignments
               {!assignment.submission_id || assignment.allow_resubmit ? (
                 <form className="inline-form" onSubmit={(event) => onSubmitAssignment(event, assignment.assignment_id)}>
                   <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" required />
+                  <small className="file-limit">Maximum file size: 2 MB</small>
                   <button type="submit">{assignment.submission_id ? 'Resubmit' : 'Submit'}</button>
                 </form>
               ) : null}
