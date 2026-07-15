@@ -37,7 +37,7 @@ export default function FacultyConsolePage({
           <label>
             Semester
             <select name="semester" defaultValue="1" required>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((semester) => (
+              {[1, 2, 3, 4].map((semester) => (
                 <option key={semester} value={semester}>Semester {semester}</option>
               ))}
             </select>

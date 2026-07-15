@@ -33,6 +33,8 @@ h3 { color: #2d3935; font-size: 1rem; margin-bottom: 4px; }
 .card, .panel { background: #fff; border: 1px solid #e5eee8; border-radius: 18px; box-shadow: 0 10px 28px rgba(30, 76, 50, .07); }
 .card { border-top: 4px solid #68cc7c; padding: 18px; }.compact { padding: 14px; }.panel { align-self: start; border-top: 4px solid #ffd140; padding: 20px; }
 .card-head { align-items: start; display: flex; gap: 16px; justify-content: space-between; }
+.assignment-card-actions { align-items: flex-end; display: flex; flex-direction: column; gap: 8px; }.assignment-card-actions .secondary { padding: .45rem .75rem; }
+.assignment-collapsed { align-items: center; background: #e8f8ed; border: 3px solid #68cc7c; border-radius: 50%; color: #20743a; display: inline-flex; font-size: 1.25rem; height: 68px; justify-content: center; padding: 0; width: 68px; }
 .student-registration { color: #718078; font-size: .78rem; font-weight: 600; white-space: nowrap; }
 .pill { background: #edf3ef; border-radius: 999px; color: #496056; display: inline-flex; font-size: .78rem; font-weight: 800; padding: .25rem .6rem; white-space: nowrap; }.pill.ok { background: #daf6e3; color: #16713b; }.pill.warn { background: #fff0d5; color: #98560a; }
 .meta { color: #718078; font-size: .9rem; }.feedback { background: #f0fbf3; border-left: 4px solid #53c870; display: grid; gap: 4px; margin: 14px 0; padding: 12px; }

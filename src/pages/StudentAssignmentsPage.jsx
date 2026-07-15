@@ -1,21 +1,49 @@
+import { useState } from 'react';
 import { formatDate } from '../lib.js';
 
 export default function StudentAssignmentsPage({ assignments, pendingAssignments, onSubmitAssignment }) {
+  const [hiddenAssignmentIds, setHiddenAssignmentIds] = useState([]);
+
+  function hideAssignment(assignmentId) {
+    setHiddenAssignmentIds((current) => [...current, assignmentId]);
+  }
+
+  function expandAssignment(assignmentId) {
+    setHiddenAssignmentIds((current) => current.filter((id) => id !== assignmentId));
+  }
+
   return (
     <section className="grid two">
       <div>
         <h2>Assignments by deadline</h2>
         <div className="stack">
           {assignments.map((assignment) => (
-            <article className="card" key={assignment.assignment_id}>
+            hiddenAssignmentIds.includes(assignment.assignment_id) ? (
+              <button
+                className="assignment-collapsed"
+                key={assignment.assignment_id}
+                type="button"
+                title={`Expand ${assignment.title}`}
+                aria-label={`Expand ${assignment.title}`}
+                onClick={() => expandAssignment(assignment.assignment_id)}
+              >
+                {assignment.title.charAt(0).toUpperCase()}
+              </button>
+            ) : (
+              <article className="card" key={assignment.assignment_id}>
               <div className="card-head">
                 <div>
                   <p className="eyebrow">{assignment.subject_name}</p>
                   <h3>{assignment.title}</h3>
                 </div>
-                <span className={assignment.submission_id ? 'pill ok' : 'pill'}>
-                  {assignment.submission_id ? 'Submitted' : 'Pending'}
-                </span>
+                <div className="assignment-card-actions">
+                  <span className={assignment.submission_id ? 'pill ok' : 'pill'}>
+                    {assignment.submission_id ? 'Submitted' : 'Pending'}
+                  </span>
+                  {assignment.grade_value && assignment.feedback?.trim() && (
+                    <button type="button" className="secondary" onClick={() => hideAssignment(assignment.assignment_id)}>Hide</button>
+                  )}
+                </div>
               </div>
               <p>{assignment.description}</p>
               <p className="meta">Deadline: {formatDate(assignment.deadline)}</p>
@@ -37,7 +65,8 @@ export default function StudentAssignmentsPage({ assignments, pendingAssignments
                   <button type="submit">{assignment.submission_id ? 'Resubmit' : 'Submit'}</button>
                 </form>
               ) : null}
-            </article>
+              </article>
+            )
           ))}
         </div>
       </div>
