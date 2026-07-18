@@ -1,20 +1,13 @@
-import { useState } from 'react';
-
 export default function FacultyConsolePage({
   subjects,
   facultyAssignments,
   selectedAssignment,
-  submissions,
   onCreateAssignment,
   onSelectAssignment,
   onDeleteAssignment,
-  onGradeSubmission,
 }) {
-  const [previewing, setPreviewing] = useState(null);
-  const canPreview = (filename = '') => /\.(pdf|png|jpe?g)$/i.test(filename);
-
   return (
-    <section className="grid faculty">
+    <section className="faculty-console">
       <form className="panel form" onSubmit={onCreateAssignment}>
         <h2>Create assignment</h2>
         <div className="form-row assignment-details">
@@ -51,7 +44,7 @@ export default function FacultyConsolePage({
         <button type="submit">Create Assignment</button>
       </form>
 
-      <div>
+      <div className="posted-assignments">
         <h2>Posted assignments</h2>
         <div className="stack">
           {facultyAssignments.map((assignment) => (
@@ -83,48 +76,6 @@ export default function FacultyConsolePage({
                 </button>
               </div>
             </div>
-          ))}
-        </div>
-
-        <h2>Submissions</h2>
-        <div className="stack">
-          {submissions.map((submission) => (
-            <article className="card compact submission-card" key={submission.user_id}>
-              <div className="card-head">
-                <h3>{submission.name} <span className="student-registration">{submission.registration_no}</span></h3>
-                <span className={`pill ${submission.submission_id ? 'ok' : ''}`}>
-                  {submission.submission_id ? (submission.is_late ? 'Late' : 'On time') : 'Missing'}
-                </span>
-              </div>
-              {submission.submission_id ? (
-                <>
-                  <div className="submission-file">
-                    <strong>{submission.original_name}</strong>
-                    {canPreview(submission.original_name) ? (
-                      <button type="button" className="secondary" onClick={() => setPreviewing(previewing === submission.submission_id ? null : submission.submission_id)}>
-                        {previewing === submission.submission_id ? 'Hide view' : 'View'}
-                      </button>
-                    ) : <span className="meta">View is available for PDF and image files.</span>}
-                  </div>
-                  {previewing === submission.submission_id && (
-                    <iframe className="submission-preview" title={`View of ${submission.original_name}`} src={`http://127.0.0.1:4000${submission.file_url}`} />
-                  )}
-                  <form className="grade-form" onSubmit={(event) => onGradeSubmission(event, submission.submission_id)}>
-                    <label>
-                      Mark secured
-                      <input name="grade_value" placeholder="8/10, A, Pass..." defaultValue={submission.grade_value || ''} required />
-                    </label>
-                    <label>
-                      Feedback
-                      <input name="feedback" placeholder="Add feedback" defaultValue={submission.feedback || ''} />
-                    </label>
-                    <button type="submit">Submit</button>
-                  </form>
-                </>
-              ) : (
-                <p className="meta">No submission yet. Faculty can chase this student.</p>
-              )}
-            </article>
           ))}
         </div>
       </div>

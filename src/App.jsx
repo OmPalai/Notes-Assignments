@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api } from './lib.js';
+import { api, apiOrigin } from './lib.js';
 import FacultyConsolePage from './pages/FacultyConsolePage.jsx';
+import FacultyGradingPage from './pages/FacultyGradingPage.jsx';
+import FacultyStudentGradesPage from './pages/FacultyStudentGradesPage.jsx';
 import NotesLibraryPage from './pages/NotesLibraryPage.jsx';
 import StudentAssignmentsPage from './pages/StudentAssignmentsPage.jsx';
 
@@ -14,6 +16,7 @@ export default function App() {
   const [facultyAssignments, setFacultyAssignments] = useState([]);
   const [selectedAssignment, setSelectedAssignment] = useState(null);
   const [submissions, setSubmissions] = useState([]);
+  const [grades, setGrades] = useState([]);
   const [notes, setNotes] = useState([]);
   const [subjectFilter, setSubjectFilter] = useState('all');
   const [noteSort, setNoteSort] = useState('recent');
@@ -49,6 +52,33 @@ export default function App() {
     setSubmissions(await response.json());
   }
 
+  async function loadGrades() {
+    const response = await fetch(`${api}/grades?facultyId=fac-001`);
+    if (response.ok) {
+      setGrades(await response.json());
+      return;
+    }
+
+    // Supports an already-running API server while it is restarted to pick up
+    // the dedicated grades endpoint.
+    const assignmentsResponse = await fetch(`${api}/assignments?role=faculty&userId=fac-001`);
+    const facultyData = await assignmentsResponse.json();
+    const submissionGroups = await Promise.all(facultyData.map(async (assignment) => {
+      const submissionsResponse = await fetch(`${api}/assignments/${assignment.assignment_id}/submissions`);
+      const assignmentSubmissions = await submissionsResponse.json();
+      return assignmentSubmissions
+        .filter((submission) => submission.grade_value)
+        .map((submission) => ({
+          ...submission,
+          student_name: submission.name,
+          assignment_title: assignment.title,
+          subject_name: assignment.subject_name,
+          graded_at: submission.graded_at,
+        }));
+    }));
+    setGrades(submissionGroups.flat().sort((first, second) => new Date(second.graded_at) - new Date(first.graded_at)));
+  }
+
   async function loadNotes() {
     const requestId = ++notesRequestId.current;
     const facultyView = role === 'faculty' ? '&facultyId=fac-001' : '';
@@ -60,6 +90,7 @@ export default function App() {
   useEffect(() => {
     loadBootstrap();
     loadAssignments();
+    loadGrades();
   }, []);
 
   useEffect(() => {
@@ -77,6 +108,10 @@ export default function App() {
       window.removeEventListener('focus', refreshNotes);
     };
   }, [role, activePage, subjectFilter, noteSort]);
+
+  useEffect(() => {
+    if (role === 'faculty' && activePage === 'studentGrades') loadGrades();
+  }, [role, activePage]);
 
   useEffect(() => {
     loadSubmissions();
@@ -147,7 +182,7 @@ export default function App() {
   async function gradeSubmission(event, submissionId) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    await fetch(`${api}/submissions/${submissionId}/grade`, {
+    const response = await fetch(`${api}/submissions/${submissionId}/grade`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -155,9 +190,39 @@ export default function App() {
         feedback: form.get('feedback'),
       }),
     });
+    if (!response.ok) {
+      setMessage('Could not save the grade. Please try again.');
+      return;
+    }
     setMessage('Grade posted to the student dashboard.');
     loadAssignments();
     loadSubmissions();
+    loadGrades();
+  }
+
+  async function saveStudentProfile(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const response = await fetch(`${api}/users/stu-001/profile`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: form.get('name'),
+        registration_no: form.get('registration_no'),
+      }),
+    });
+
+    if (!response.ok) {
+      setMessage('Could not save profile changes. Please try again.');
+      return;
+    }
+
+    const updatedProfile = await response.json();
+    setUsers((current) => current.map((user) => (
+      user.user_id === updatedProfile.user_id ? { ...user, ...updatedProfile } : user
+    )));
+    setProfileOpen(false);
+    setMessage('Profile updated successfully.');
   }
 
   async function uploadNote(event) {
@@ -177,7 +242,7 @@ export default function App() {
   async function downloadNote(note) {
     const response = await fetch(`${api}/notes/${note.note_id}/download`, { method: 'POST' });
     const data = await response.json();
-    window.open(`http://127.0.0.1:4000${data.file_url}`, '_blank');
+    window.open(`${apiOrigin}${data.file_url}`, '_blank');
     setNotes((current) => current.map((item) => (
       item.note_id === note.note_id ? { ...item, download_count: item.download_count + 1 } : item
     )));
@@ -293,7 +358,9 @@ export default function App() {
       ]
     : [
         ['facultyConsole', 'Faculty Console'],
+        ['facultyGrading', 'Grade Submissions'],
         ['notesManagement', 'Notes Management'],
+        ['studentGrades', 'Student Grades'],
       ];
 
   return (
@@ -320,10 +387,19 @@ export default function App() {
                 {studentProfile.name.charAt(0)}
               </button>
               {profileOpen && (
-                <section className="profile-card" aria-label="Student profile">
-                  <strong>{studentProfile.name}</strong>
-                  <span>{studentProfile.registration_no || '2505280041'}</span>
-                  <span>Course: MCA</span>
+                <section className="profile-card" aria-label="Edit student profile">
+                  <form className="profile-form" onSubmit={saveStudentProfile}>
+                    <label>
+                      Name
+                      <input name="name" defaultValue={studentProfile.name} required />
+                    </label>
+                    <label>
+                      Registration number
+                      <input name="registration_no" defaultValue={studentProfile.registration_no || '2505280041'} required />
+                    </label>
+                    <span>Course: MCA</span>
+                    <button type="submit">Save profile</button>
+                  </form>
                 </section>
               )}
             </div>
@@ -353,10 +429,18 @@ export default function App() {
           subjects={subjects}
           facultyAssignments={facultyAssignments}
           selectedAssignment={selectedAssignment}
-          submissions={submissions}
           onCreateAssignment={createAssignment}
           onSelectAssignment={setSelectedAssignment}
           onDeleteAssignment={deleteAssignment}
+        />
+      )}
+
+      {activePage === 'facultyGrading' && (
+        <FacultyGradingPage
+          facultyAssignments={facultyAssignments}
+          selectedAssignment={selectedAssignment}
+          submissions={submissions}
+          onSelectAssignment={setSelectedAssignment}
           onGradeSubmission={gradeSubmission}
         />
       )}
@@ -393,6 +477,8 @@ export default function App() {
           isFaculty
         />
       )}
+
+      {activePage === 'studentGrades' && <FacultyStudentGradesPage grades={grades} />}
     </main>
   );
 }

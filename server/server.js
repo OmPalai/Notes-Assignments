@@ -34,6 +34,20 @@ app.get('/api/bootstrap', async (_request, response) => {
   response.json({ subjects, users });
 });
 
+app.patch('/api/users/:userId/profile', async (request, response) => {
+  const user = await get('SELECT user_id, role FROM users WHERE user_id = ?', [request.params.userId]);
+  if (!user) return response.status(404).json({ error: 'User not found' });
+
+  const name = String(request.body.name || '').trim();
+  const registrationNo = String(request.body.registration_no || '').trim();
+  if (!name || !registrationNo) {
+    return response.status(400).json({ error: 'Name and registration number are required' });
+  }
+
+  await run('UPDATE users SET name = ?, registration_no = ? WHERE user_id = ?', [name, registrationNo, user.user_id]);
+  response.json({ user_id: user.user_id, name, registration_no: registrationNo });
+});
+
 app.get('/api/assignments', async (request, response) => {
   const role = request.query.role || 'student';
   const userId = request.query.userId || 'stu-001';
@@ -196,14 +210,47 @@ app.post('/api/assignments/:assignmentId/submit', studentUpload.single('file'), 
 });
 
 app.patch('/api/submissions/:submissionId/grade', async (request, response) => {
+  const submission = await get(
+    `SELECT sub.submission_id, sub.student_id, u.name, u.registration_no
+    FROM submissions sub
+    JOIN users u ON u.user_id = sub.student_id
+    WHERE sub.submission_id = ?`,
+    [request.params.submissionId],
+  );
+  if (!submission) return response.status(404).json({ error: 'Submission not found' });
+
+  const gradeValue = String(request.body.grade_value || '').trim();
+  if (!gradeValue) return response.status(400).json({ error: 'A grade is required' });
+
   await run(
     `UPDATE submissions
     SET grade_value = ?, feedback = ?, graded_at = ?, graded_by = ?
     WHERE submission_id = ?`,
-    [request.body.grade_value, request.body.feedback || '', now(), request.body.graded_by || 'fac-001', request.params.submissionId],
+    [gradeValue, request.body.feedback || '', now(), request.body.graded_by || 'fac-001', request.params.submissionId],
   );
 
-  response.json({ ok: true });
+  response.json({
+    ok: true,
+    grade_value: gradeValue,
+    student_name: submission.name,
+    registration_no: submission.registration_no,
+  });
+});
+
+app.get('/api/grades', async (request, response) => {
+  const facultyId = request.query.facultyId || 'fac-001';
+  const rows = await all(
+    `SELECT sub.submission_id, sub.grade_value, sub.feedback, sub.graded_at,
+      u.name AS student_name, u.registration_no, a.title AS assignment_title, s.name AS subject_name
+    FROM submissions sub
+    JOIN assignments a ON a.assignment_id = sub.assignment_id
+    JOIN users u ON u.user_id = sub.student_id
+    JOIN subjects s ON s.subject_id = a.subject_id
+    WHERE a.faculty_id = ? AND sub.grade_value IS NOT NULL
+    ORDER BY sub.graded_at DESC`,
+    [facultyId],
+  );
+  response.json(rows);
 });
 
 app.get('/api/notes', async (request, response) => {
@@ -354,7 +401,7 @@ app.use((error, _request, response, next) => {
 });
 
 initializeDatabase().then(() => {
-  app.listen(port, () => {
-    console.log(`Student OS API running on http://127.0.0.1:${port}`);
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Student OS API listening on port ${port}`);
   });
 });

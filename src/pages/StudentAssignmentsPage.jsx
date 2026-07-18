@@ -1,5 +1,31 @@
-import { useState } from 'react';
-import { formatDate } from '../lib.js';
+import { useEffect, useState } from 'react';
+import { apiOrigin, formatDate } from '../lib.js';
+
+function DeadlineCountdown({ deadline }) {
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+  const remaining = new Date(deadline).getTime() - currentTime;
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  if (remaining <= 0) return <p className="countdown expired">Deadline passed</p>;
+
+  const totalSeconds = Math.floor(remaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const timeLeft = [
+    days && `${days}d`,
+    `${String(hours).padStart(2, '0')}h`,
+    `${String(minutes).padStart(2, '0')}m`,
+    `${String(seconds).padStart(2, '0')}s`,
+  ].filter(Boolean).join(' ');
+
+  return <p className="countdown">Time left to upload: <strong>{timeLeft}</strong></p>;
+}
 
 export default function StudentAssignmentsPage({ assignments, pendingAssignments, onSubmitAssignment }) {
   const [hiddenAssignmentIds, setHiddenAssignmentIds] = useState([]);
@@ -27,7 +53,8 @@ export default function StudentAssignmentsPage({ assignments, pendingAssignments
                 aria-label={`Expand ${assignment.title}`}
                 onClick={() => expandAssignment(assignment.assignment_id)}
               >
-                {assignment.title.charAt(0).toUpperCase()}
+                <strong>{assignment.title}</strong>
+                <span>Show assignment</span>
               </button>
             ) : (
               <article className="card" key={assignment.assignment_id}>
@@ -47,8 +74,9 @@ export default function StudentAssignmentsPage({ assignments, pendingAssignments
               </div>
               <p>{assignment.description}</p>
               <p className="meta">Deadline: {formatDate(assignment.deadline)}</p>
+              <DeadlineCountdown deadline={assignment.deadline} />
               {assignment.assignment_file_url && (
-                <a className="download" href={`http://127.0.0.1:4000${assignment.assignment_file_url}`} target="_blank" rel="noreferrer">
+                <a className="download" href={`${apiOrigin}${assignment.assignment_file_url}`} target="_blank" rel="noreferrer">
                   View assignment: {assignment.assignment_original_name || 'Open file'}
                 </a>
               )}
