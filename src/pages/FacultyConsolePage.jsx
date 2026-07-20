@@ -12,14 +12,6 @@ export default function FacultyConsolePage({
         <h2>Create Assignment</h2>
         <div className="form-row assignment-details">
           <label>
-            Subject
-            <select name="subject_id" required>
-              {subjects.map((subject) => (
-                <option key={subject.subject_id} value={subject.subject_id}>{subject.name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
             Course
             <select name="course" defaultValue="MCA" required>
               <option value="MCA">MCA</option>
@@ -32,6 +24,14 @@ export default function FacultyConsolePage({
             <select name="semester" defaultValue="1" required>
               {[1, 2, 3, 4].map((semester) => (
                 <option key={semester} value={semester}>Semester {semester}</option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Subject
+            <select name="subject_id" required>
+              {subjects.map((subject) => (
+                <option key={subject.subject_id} value={subject.subject_id}>{subject.name}</option>
               ))}
             </select>
           </label>
