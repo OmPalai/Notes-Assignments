@@ -9,7 +9,7 @@ export default function FacultyConsolePage({
   return (
     <section className="faculty-console">
       <form className="panel form" onSubmit={onCreateAssignment}>
-        <h2>Create assignment</h2>
+        <h2>Create Assignment</h2>
         <div className="form-row assignment-details">
           <label>
             Subject
@@ -45,7 +45,7 @@ export default function FacultyConsolePage({
       </form>
 
       <div className="posted-assignments">
-        <h2>Posted assignments</h2>
+        <h2>Posted Assignment</h2>
         <div className="stack">
           {facultyAssignments.map((assignment) => (
             <div

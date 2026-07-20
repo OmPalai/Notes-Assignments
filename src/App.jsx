@@ -5,6 +5,8 @@ import FacultyGradingPage from './pages/FacultyGradingPage.jsx';
 import FacultyStudentGradesPage from './pages/FacultyStudentGradesPage.jsx';
 import NotesLibraryPage from './pages/NotesLibraryPage.jsx';
 import StudentAssignmentsPage from './pages/StudentAssignmentsPage.jsx';
+import niisLogo from './assets/niis-logo.jpg';
+import niisCampus from './assets/niis-campus.jpg';
 
 export default function App() {
   const [role, setRole] = useState(null);
@@ -373,7 +375,7 @@ export default function App() {
         <div className="account-actions">
           <div className="status-strip">
             <strong>{isStudent ? pendingAssignments.length : facultyAssignments.length}</strong>
-            <span>{isStudent ? 'pending' : 'assignments'}</span>
+            <span>{isStudent ? 'Pending' : 'Assignment'}</span>
           </div>
           {isStudent && (
             <div className="profile-menu">
@@ -485,11 +487,10 @@ export default function App() {
 
 function LoginPage({ onLogin }) {
   return (
-    <main className="login-page">
+    <main className="login-page" style={{ backgroundImage: `linear-gradient(135deg, rgba(12, 43, 31, .58), rgba(23, 71, 46, .28)), url(${niisCampus})` }}>
       <section className="login-card">
-        <div className="login-brand"><span>🎓</span><strong>NIIS</strong></div>
-        <p className="eyebrow">Institute portal</p>
-        <h1>Welcome back</h1>
+        <div className="login-brand"><img src={niisLogo} alt="NIIS Group of Institutions logo" /><strong>NIIS Institute of Business Administration</strong></div>
+        <h1>Welcome</h1>
         <p className="login-copy">Choose your portal to continue to your academic workspace.</p>
         <div className="login-options">
           <button className="login-option student-login" type="button" onClick={() => onLogin('student')}>
