@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS notes (
   note_id TEXT PRIMARY KEY,
   title TEXT NOT NULL,
   subject_id TEXT NOT NULL,
+  course TEXT,
+  semester TEXT,
   topic TEXT NOT NULL,
   uploaded_by TEXT NOT NULL,
   file_url TEXT NOT NULL,
@@ -87,6 +89,7 @@ CREATE TABLE IF NOT EXISTS note_reports (
   reason TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'reviewed', 'dismissed', 'action_taken')),
   created_at TEXT NOT NULL,
+  UNIQUE (note_id, reported_by),
   FOREIGN KEY (note_id) REFERENCES notes(note_id),
   FOREIGN KEY (reported_by) REFERENCES users(user_id)
 );

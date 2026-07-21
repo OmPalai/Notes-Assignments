@@ -41,7 +41,7 @@ app.patch('/api/users/:userId/profile', async (request, response) => {
   const name = String(request.body.name || '').trim();
   const registrationNo = String(request.body.registration_no || '').trim();
   if (!name || !registrationNo) {
-    return response.status(400).json({ error: 'Name and registration number are required' });
+    return response.status(400).json({ error: `Name and ${user.role === 'faculty' ? 'faculty ID' : 'registration number'} are required` });
   }
 
   await run('UPDATE users SET name = ?, registration_no = ? WHERE user_id = ?', [name, registrationNo, user.user_id]);
@@ -263,7 +263,9 @@ app.get('/api/notes', async (request, response) => {
   }[sort] || 'n.uploaded_at DESC';
   const params = [];
   const facultyView = request.query.facultyId;
-  let where = facultyView ? '1 = 1' : "n.status = 'active'";
+  let where = facultyView ? 'n.uploaded_by = ?' : "n.status = 'active'";
+
+  if (facultyView) params.push(facultyView);
 
   if (subjectId && subjectId !== 'all') {
     where += ' AND n.subject_id = ?';
@@ -271,11 +273,14 @@ app.get('/api/notes', async (request, response) => {
   }
 
   const rows = await all(
-    `SELECT n.*, s.name AS subject_name, u.name AS uploader
+    `SELECT n.*, s.name AS subject_name, u.name AS uploader,
+      COUNT(DISTINCT r.reported_by) AS report_count
     FROM notes n
     JOIN subjects s ON s.subject_id = n.subject_id
     JOIN users u ON u.user_id = n.uploaded_by
+    LEFT JOIN note_reports r ON r.note_id = n.note_id
     WHERE ${where}
+    GROUP BY n.note_id
     ORDER BY ${orderBy}`,
     params,
   );
@@ -288,6 +293,8 @@ app.post('/api/notes', facultyUpload.single('file'), async (request, response) =
     note_id: id('note'),
     title: request.body.title,
     subject_id: request.body.subject_id,
+    course: request.body.course,
+    semester: request.body.semester,
     topic: request.body.topic,
     uploaded_by: request.body.uploaded_by || 'stu-001',
     file_url: `/uploads/${request.file.filename}`,
@@ -299,14 +306,26 @@ app.post('/api/notes', facultyUpload.single('file'), async (request, response) =
     uploaded_at: now(),
   };
 
-  await run(`INSERT INTO notes VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, Object.values(note));
+  await run(`INSERT INTO notes (
+    note_id, title, subject_id, course, semester, topic, uploaded_by, file_url,
+    original_name, description, download_count, upvote_count, status, uploaded_at
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, Object.values(note));
   response.status(201).json(note);
 });
 
-app.post('/api/notes/:noteId/download', async (request, response) => {
+app.get('/api/notes/:noteId/download', async (request, response) => {
+  const note = await get('SELECT file_url, original_name FROM notes WHERE note_id = ?', [request.params.noteId]);
+  if (!note) return response.status(404).json({ error: 'Note not found' });
+
+  const filePath = path.join(uploadDir, path.basename(note.file_url));
+  try {
+    await fs.promises.access(filePath, fs.constants.R_OK);
+  } catch {
+    return response.status(404).json({ error: 'The uploaded file is no longer available.' });
+  }
+
   await run('UPDATE notes SET download_count = download_count + 1 WHERE note_id = ?', [request.params.noteId]);
-  const note = await get('SELECT file_url FROM notes WHERE note_id = ?', [request.params.noteId]);
-  response.json(note);
+  return response.download(filePath, note.original_name);
 });
 
 app.post('/api/notes/:noteId/upvote', async (request, response) => {
@@ -326,16 +345,24 @@ app.post('/api/notes/:noteId/upvote', async (request, response) => {
 });
 
 app.post('/api/notes/:noteId/report', async (request, response) => {
+  const note = await get('SELECT note_id FROM notes WHERE note_id = ?', [request.params.noteId]);
+  if (!note) return response.status(404).json({ error: 'Note not found' });
+
+  const reporterId = request.body.reported_by || 'stu-001';
+  const existingReport = await get(
+    'SELECT report_id FROM note_reports WHERE note_id = ? AND reported_by = ?',
+    [note.note_id, reporterId],
+  );
+  if (existingReport) return response.status(409).json({ error: 'You have already reported this note.' });
+
   await run('INSERT INTO note_reports VALUES (?, ?, ?, ?, ?, ?)', [
-    id('report'),
-    request.params.noteId,
-    request.body.reported_by || 'stu-001',
-    request.body.reason,
-    'open',
-    now(),
+    id('report'), note.note_id, reporterId, request.body.reason || 'Reported by student', 'open', now(),
   ]);
-  await run("UPDATE notes SET status = 'reported' WHERE note_id = ?", [request.params.noteId]);
-  response.status(201).json({ ok: true });
+  const reportCount = await get(
+    'SELECT COUNT(DISTINCT reported_by) AS report_count FROM note_reports WHERE note_id = ?',
+    [note.note_id],
+  );
+  response.status(201).json({ ok: true, report_count: reportCount.report_count });
 });
 
 app.patch('/api/notes/:noteId/visibility', async (request, response) => {

@@ -67,6 +67,8 @@ async function migrate() {
     await run("UPDATE users SET registration_no = '2505280042' WHERE user_id = 'stu-002'");
   }
 
+  await run("UPDATE users SET registration_no = 'FAC-001' WHERE user_id = 'fac-001' AND (registration_no IS NULL OR TRIM(registration_no) = '')");
+
   if (!columnNames.includes('assignment_file_url')) {
     await run('ALTER TABLE assignments ADD COLUMN assignment_file_url TEXT');
   }
@@ -90,6 +92,8 @@ async function migrate() {
       note_id TEXT PRIMARY KEY,
       title TEXT NOT NULL,
       subject_id TEXT NOT NULL,
+      course TEXT,
+      semester TEXT,
       topic TEXT NOT NULL,
       uploaded_by TEXT NOT NULL,
       file_url TEXT NOT NULL,
@@ -102,9 +106,30 @@ async function migrate() {
       FOREIGN KEY (subject_id) REFERENCES subjects(subject_id),
       FOREIGN KEY (uploaded_by) REFERENCES users(user_id)
     )`);
-    await run('INSERT INTO notes SELECT * FROM notes_legacy');
+    await run(`INSERT INTO notes (
+      note_id, title, subject_id, topic, uploaded_by, file_url, original_name,
+      description, download_count, upvote_count, status, uploaded_at
+    ) SELECT
+      note_id, title, subject_id, topic, uploaded_by, file_url, original_name,
+      description, download_count, upvote_count, status, uploaded_at
+    FROM notes_legacy`);
     await run('DROP TABLE notes_legacy');
   }
+
+  const currentNoteColumns = await all('PRAGMA table_info(notes)');
+  const currentNoteColumnNames = currentNoteColumns.map((column) => column.name);
+
+  if (!currentNoteColumnNames.includes('course')) {
+    await run('ALTER TABLE notes ADD COLUMN course TEXT');
+  }
+
+  if (!currentNoteColumnNames.includes('semester')) {
+    await run('ALTER TABLE notes ADD COLUMN semester TEXT');
+  }
+
+  // Reports are now reviewed without removing a note from the library. Restore
+  // notes hidden by the previous automatic "reported" status behavior.
+  await run("UPDATE notes SET status = 'active' WHERE status = 'reported'");
 }
 
 async function seed() {
@@ -117,7 +142,7 @@ async function seed() {
 
   await run("INSERT INTO users (user_id, name, registration_no, role) VALUES ('stu-001', 'Aarav Mohanty', '2505280041', 'student')");
   await run("INSERT INTO users (user_id, name, registration_no, role) VALUES ('stu-002', 'Priya Das', '2505280042', 'student')");
-  await run("INSERT INTO users (user_id, name, role) VALUES ('fac-001', 'Prof. Meera Sen', 'faculty')");
+  await run("INSERT INTO users (user_id, name, registration_no, role) VALUES ('fac-001', 'Prof. Meera Sen', 'FAC-001', 'faculty')");
   await run("INSERT INTO users (user_id, name, role) VALUES ('admin-001', 'Admin User', 'admin')");
 
   await run("INSERT INTO enrollments VALUES ('stu-001', 'sub-dbms')");
@@ -143,8 +168,11 @@ async function seed() {
   );
 
   await run(
-    `INSERT INTO notes VALUES
-    ('note-001', 'OS Unit 3 - Process Scheduling', 'sub-os', 'Process Scheduling', 'stu-001', '/uploads/sample-os-notes.pdf', 'sample-os-notes.pdf', 'Short notes for CPU scheduling algorithms.', 14, 5, 'active', ?)`,
+    `INSERT INTO notes (
+      note_id, title, subject_id, course, semester, topic, uploaded_by, file_url,
+      original_name, description, download_count, upvote_count, status, uploaded_at
+    ) VALUES
+    ('note-001', 'OS Unit 3 - Process Scheduling', 'sub-os', 'MCA', '1', 'Process Scheduling', 'stu-001', '/uploads/sample-os-notes.pdf', 'sample-os-notes.pdf', 'Short notes for CPU scheduling algorithms.', 14, 5, 'active', ?)`,
     [new Date().toISOString()],
   );
 }

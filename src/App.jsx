@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { api, apiOrigin } from './lib.js';
+import { api } from './lib.js';
 import FacultyConsolePage from './pages/FacultyConsolePage.jsx';
 import FacultyGradingPage from './pages/FacultyGradingPage.jsx';
 import FacultyStudentGradesPage from './pages/FacultyStudentGradesPage.jsx';
@@ -202,10 +202,10 @@ export default function App() {
     loadGrades();
   }
 
-  async function saveStudentProfile(event) {
+  async function saveProfile(event, userId) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const response = await fetch(`${api}/users/stu-001/profile`, {
+    const response = await fetch(`${api}/users/${userId}/profile`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -242,9 +242,7 @@ export default function App() {
   }
 
   async function downloadNote(note) {
-    const response = await fetch(`${api}/notes/${note.note_id}/download`, { method: 'POST' });
-    const data = await response.json();
-    window.open(`${apiOrigin}${data.file_url}`, '_blank');
+    window.open(`${api}/notes/${note.note_id}/download`, '_blank', 'noopener,noreferrer');
     setNotes((current) => current.map((item) => (
       item.note_id === note.note_id ? { ...item, download_count: item.download_count + 1 } : item
     )));
@@ -272,11 +270,15 @@ export default function App() {
       body: JSON.stringify({ reason: 'Reported by student', reported_by: 'stu-001' }),
     });
     if (!response.ok) {
-      setMessage('Could not send the report.');
+      const error = await response.json().catch(() => ({}));
+      setMessage(error.error || 'Could not send the report.');
       return;
     }
-    setMessage('Report sent to admin moderation.');
-    setNotes((current) => current.filter((note) => note.note_id !== noteId));
+    const data = await response.json();
+    setMessage('Report sent to admin moderation. The note remains available while it is reviewed.');
+    setNotes((current) => current.map((note) => (
+      note.note_id === noteId ? { ...note, report_count: data.report_count } : note
+    )));
   }
 
   async function deleteNote(noteId) {
@@ -353,6 +355,11 @@ export default function App() {
     name: 'Aarav Mohanty',
     registration_no: '2505280041',
   };
+  const facultyProfile = users.find((user) => user.user_id === 'fac-001') || {
+    name: 'Prof. Meera Sen',
+    registration_no: 'FAC-001',
+  };
+  const activeProfile = isStudent ? studentProfile : facultyProfile;
   const pages = isStudent
     ? [
         ['studentAssignments', 'Student Assignments'],
@@ -377,35 +384,33 @@ export default function App() {
             <strong>{isStudent ? pendingAssignments.length : facultyAssignments.length}</strong>
             <span>{isStudent ? 'Pending' : 'Assignment'}</span>
           </div>
-          {isStudent && (
-            <div className="profile-menu">
-              <button
-                className="profile-button"
-                type="button"
-                aria-label="View student profile"
-                aria-expanded={profileOpen}
-                onClick={() => setProfileOpen((open) => !open)}
-              >
-                {studentProfile.name.charAt(0)}
-              </button>
-              {profileOpen && (
-                <section className="profile-card" aria-label="Edit student profile">
-                  <form className="profile-form" onSubmit={saveStudentProfile}>
-                    <label>
-                      Name
-                      <input name="name" defaultValue={studentProfile.name} required />
-                    </label>
-                    <label>
-                      Registration number
-                      <input name="registration_no" defaultValue={studentProfile.registration_no || '2505280041'} required />
-                    </label>
-                    <span>Course: MCA</span>
-                    <button type="submit">Save profile</button>
-                  </form>
-                </section>
-              )}
-            </div>
-          )}
+          <div className="profile-menu">
+            <button
+              className="profile-button"
+              type="button"
+              aria-label={`View ${isStudent ? 'student' : 'faculty'} profile`}
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((open) => !open)}
+            >
+              {activeProfile.name.charAt(0)}
+            </button>
+            {profileOpen && (
+              <section className="profile-card" aria-label={`Edit ${isStudent ? 'student' : 'faculty'} profile`}>
+                <form className="profile-form" onSubmit={(event) => saveProfile(event, isStudent ? 'stu-001' : 'fac-001')}>
+                  <label>
+                    Name
+                    <input name="name" defaultValue={activeProfile.name} required />
+                  </label>
+                  <label>
+                    {isStudent ? 'Registration number' : 'Faculty ID'}
+                    <input name="registration_no" defaultValue={activeProfile.registration_no || (isStudent ? '2505280041' : 'FAC-001')} required />
+                  </label>
+                  {isStudent && <span>Course: MCA</span>}
+                  <button type="submit">Save profile</button>
+                </form>
+              </section>
+            )}
+          </div>
           <button className="logout" type="button" onClick={signOut}>Log out</button>
         </div>
       </header>
