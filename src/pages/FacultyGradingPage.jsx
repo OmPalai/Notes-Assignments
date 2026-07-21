@@ -17,7 +17,7 @@ export default function FacultyGradingPage({
         <div>
           <p className="eyebrow">Assessment workspace</p>
           <h2>View and grade submissions</h2>
-          <p className="meta">Select an assignment, open each uploaded file, then save the grade and feedback for the student.</p>
+          <p className="meta">Select an assignment, open each uploaded file , and then save the grade and feedback for the student.</p>
         </div>
         <label className="assignment-picker">
           Assignment
@@ -33,7 +33,7 @@ export default function FacultyGradingPage({
         </label>
       </div>
 
-      {!selectedAssignment ? <div className="empty">Create or select an assignment to review student submissions.</div> : (
+      {facultyAssignments.length === 0 ? <div className="empty">No assignments available. Please create an assignment to begin.</div> : !selectedAssignment ? <div className="empty">Create or select an assignment to review student submissions.</div> : (
         <>
           <div className="grading-summary">
             <strong>{selectedAssignment.title}</strong>

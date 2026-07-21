@@ -376,13 +376,13 @@ export default function App() {
     <main className="shell">
       <header className="topbar">
         <div>
-          <p className="eyebrow">NIIS · {isStudent ? 'Student Portal' : 'Faculty Portal'}</p>
+          <p className="eyebrow">{isStudent ? 'NIBA STUDENT PORTAL' : 'NIBA FACULTY PORTAL'}</p>
           <h1>{pages.find(([page]) => page === activePage)?.[1]}</h1>
         </div>
         <div className="account-actions">
           <div className="status-strip">
             <strong>{isStudent ? pendingAssignments.length : facultyAssignments.length}</strong>
-            <span>{isStudent ? 'Pending' : 'Assignment'}</span>
+            <span>{isStudent ? 'Pending' : 'Assignments'}</span>
           </div>
           <div className="profile-menu">
             <button
