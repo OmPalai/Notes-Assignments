@@ -371,59 +371,53 @@ export default function App() {
         ['notesManagement', 'Notes Management'],
         ['studentGrades', 'Student Grades'],
       ];
+  const pageTitle = {
+    studentAssignments: 'Assignments',
+    notesLibrary: 'Notes and study material',
+    facultyConsole: 'Assignments',
+    facultyGrading: 'Grade submissions',
+    notesManagement: 'Notes and study material',
+    studentGrades: 'Student grades',
+  }[activePage];
 
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">{isStudent ? 'NIBA STUDENT PORTAL' : 'NIBA FACULTY PORTAL'}</p>
-          <h1>{pages.find(([page]) => page === activePage)?.[1]}</h1>
-        </div>
-        <div className="account-actions">
-          <div className="status-strip">
-            <strong>{isStudent ? pendingAssignments.length : facultyAssignments.length}</strong>
-            <span>{isStudent ? 'Pending' : 'Assignments'}</span>
-          </div>
-          <div className="profile-menu">
-            <button
-              className="profile-button"
-              type="button"
-              aria-label={`View ${isStudent ? 'student' : 'faculty'} profile`}
-              aria-expanded={profileOpen}
-              onClick={() => setProfileOpen((open) => !open)}
-            >
-              {activeProfile.name.charAt(0)}
+    <main className="portal-layout">
+      <aside className="sidebar">
+        <div className="brand-mark"><span>SO</span><strong>Student OS</strong></div>
+        <p className="sidebar-label">{isStudent ? 'STUDENT SPACE' : 'FACULTY SPACE'}</p>
+        <nav className="tabs" aria-label="Primary navigation">
+          {pages.map(([page, label], index) => (
+            <button key={page} className={activePage === page ? 'active' : ''} onClick={() => setActivePage(page)}>
+              <span className="nav-icon" aria-hidden="true">{['□', '▤', '◫', '◇'][index]}</span>{label}
             </button>
-            {profileOpen && (
-              <section className="profile-card" aria-label={`Edit ${isStudent ? 'student' : 'faculty'} profile`}>
-                <form className="profile-form" onSubmit={(event) => saveProfile(event, isStudent ? 'stu-001' : 'fac-001')}>
-                  <label>
-                    Name
-                    <input name="name" defaultValue={activeProfile.name} required />
-                  </label>
-                  <label>
-                    {isStudent ? 'Registration number' : 'Faculty ID'}
-                    <input name="registration_no" defaultValue={activeProfile.registration_no || (isStudent ? '2505280041' : 'FAC-001')} required />
-                  </label>
-                  {isStudent && <span>Course: MCA</span>}
-                  <button type="submit">Save profile</button>
-                </form>
-              </section>
-            )}
-          </div>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          <button className="profile-summary" type="button" onClick={() => setProfileOpen((open) => !open)} aria-expanded={profileOpen}>
+            <span className="profile-button">{activeProfile.name.charAt(0)}</span><span><strong>{activeProfile.name}</strong><small>{isStudent ? 'Student account' : 'Faculty account'}</small></span>
+          </button>
+          {profileOpen && (
+            <section className="profile-card" aria-label="Edit profile">
+              <form className="profile-form" onSubmit={(event) => saveProfile(event, isStudent ? 'stu-001' : 'fac-001')}>
+                <label>Name<input name="name" defaultValue={activeProfile.name} required /></label>
+                <label>{isStudent ? 'Registration number' : 'Faculty ID'}<input name="registration_no" defaultValue={activeProfile.registration_no || (isStudent ? '2505280041' : 'FAC-001')} required /></label>
+                <button type="submit">Save profile</button>
+              </form>
+            </section>
+          )}
           <button className="logout" type="button" onClick={signOut}>Log out</button>
         </div>
-      </header>
+      </aside>
 
-      <nav className="tabs" aria-label="Primary">
-        {pages.map(([page, label]) => (
-          <button key={page} className={activePage === page ? 'active' : ''} onClick={() => setActivePage(page)}>{label}</button>
-        ))}
-      </nav>
+      <section className="shell">
+        <header className="topbar">
+          <div><p className="eyebrow">ACADEMICS</p><h1>{pageTitle}</h1></div>
+          <div className="status-strip"><strong>{isStudent ? pendingAssignments.length : facultyAssignments.length}</strong><span>{isStudent ? 'active assignments' : 'published assignments'}</span></div>
+        </header>
 
-      {message && <p className="toast">{message}</p>}
+        {message && <p className="toast">{message}</p>}
 
-      {activePage === 'studentAssignments' && (
+        {activePage === 'studentAssignments' && (
         <StudentAssignmentsPage
           assignments={assignments}
           pendingAssignments={pendingAssignments}
@@ -485,7 +479,8 @@ export default function App() {
         />
       )}
 
-      {activePage === 'studentGrades' && <FacultyStudentGradesPage grades={grades} />}
+        {activePage === 'studentGrades' && <FacultyStudentGradesPage grades={grades} />}
+      </section>
     </main>
   );
 }
